@@ -133,6 +133,55 @@ function show_client_config() {
   echo
 }
 
+function modify_config() {
+  if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "未检测到配置文件，请先创建代理。"
+    return
+  fi
+
+  # 读取当前端口和密码
+  CURRENT_PORT=$(cat "$CONFIG_DIR/.listen_port" 2>/dev/null || echo "443")
+  CURRENT_PASS=$(cat "$CONFIG_DIR/.password" 2>/dev/null || echo "")
+
+  echo "当前监听端口: $CURRENT_PORT"
+  while true; do
+    read -rp "请输入新的监听端口（回车保持 $CURRENT_PORT）: " NEW_PORT
+    NEW_PORT=${NEW_PORT:-$CURRENT_PORT}
+    if [[ $NEW_PORT =~ ^[0-9]+$ ]] && (( NEW_PORT>0 && NEW_PORT<65536 )); then
+      break
+    else
+      echo "端口输入不合法，请输入 1-65535 之间的数字"
+    fi
+  done
+
+  echo "当前混淆密码: $CURRENT_PASS"
+  while true; do
+    read -rp "请输入新的混淆密码（回车保持当前密码）: " NEW_PASS
+    NEW_PASS=${NEW_PASS:-$CURRENT_PASS}
+    if [[ -n "$NEW_PASS" ]]; then
+      break
+    else
+      echo "密码不能为空，请重新输入。"
+    fi
+  done
+
+  # 修改配置文件
+  sed -i "s/^listen: :.*/listen: :$NEW_PORT/" "$CONFIG_FILE"
+  sed -i "s/^\(\s*password:\s*\).*$/\1$NEW_PASS/" "$CONFIG_FILE"
+
+  # 保存新的端口和密码
+  echo "$NEW_PORT" > "$CONFIG_DIR/.listen_port"
+  echo "$NEW_PASS" > "$CONFIG_DIR/.password"
+
+  echo "修改配置完成，正在重启 hysteria 服务..."
+
+  pkill hysteria 2>/dev/null || true
+  nohup "$INSTALL_PATH" server --config "$CONFIG_FILE" > "$LOG_PATH" 2>&1 &
+  sleep 1
+
+  echo "hysteria 已重启，监听端口: $NEW_PORT"
+}
+
 function uninstall_hysteria() {
   echo "停止 hysteria 服务..."
   pkill hysteria 2>/dev/null || echo "hysteria 服务未运行或已停止"
@@ -158,14 +207,16 @@ function main_menu() {
     echo "        Hysteria 微型管理面板"
     echo "==================================="
     echo "1) 创建并启动 hy2 代理"
-    echo "2) 查看配置"
-    echo "3) 删除 hy2 及面板脚本"
-    echo "4) 退出"
-    read -rp "请选择操作 [1-4]: " choice
+    echo "2) 修改 hy2 配置"
+    echo "3) 查看配置"
+    echo "4) 删除 hy2 及面板脚本"
+    echo "5) 退出"
+    read -rp "请选择操作 [1-5]: " choice
     case $choice in
       1) install_hysteria ;;
-      2) show_client_config ;;
-      3)
+      2) modify_config ;;
+      3) show_client_config ;;
+      4)
         read -rp "确认删除 hysteria 程序、配置及本脚本？(y/n): " confirm
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
           uninstall_hysteria
@@ -174,7 +225,7 @@ function main_menu() {
           echo "取消删除。" 
         fi
       ;;
-      4)
+      5)
         echo "退出。"
         exit 0
       ;;
