@@ -120,6 +120,8 @@ EOF
   echo "hy2://$PASSWORD@${SERVER_IP}:${LISTEN_PORT}?sni=bing.com&insecure=1#${SERVER_IP}-${COUNTRY_CODE}"
   echo
   echo "日志路径: $LOG_PATH"
+  
+  show_client_config
 }
 
 function show_client_config() {
