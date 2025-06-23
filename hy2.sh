@@ -35,8 +35,11 @@ function install_hysteria() {
       apt-get install -y curl wget openssl jq
   elif command -v yum &>/dev/null; then
       yum install -y curl wget openssl jq
+  elif command -v apk &>/dev/null; then
+      apk update
+      apk add curl wget openssl jq
   else
-      echo "未检测到 apt-get 或 yum，请手动安装 curl wget openssl jq"
+      echo "未检测到 apt-get、yum 或 apk，请手动安装 curl wget openssl jq"
   fi
 
   HY_BIN_URL=$(get_download_url)
@@ -207,7 +210,7 @@ function main_menu() {
     echo "        Hysteria 微型管理面板"
     echo "==================================="
     echo "1) 创建并启动 hy2 代理"
-    echo "2) 修改 hy2 配置"
+    echo "2) 修改 hy2 配置（端口和密码）"
     echo "3) 查看配置"
     echo "4) 删除 hy2 及面板脚本"
     echo "5) 退出"
