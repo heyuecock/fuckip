@@ -16,7 +16,6 @@ sudo chmod +x /usr/local/bin/agent
 ```
 执行以上命令即可下载并授权脚本到 /usr/local/bin/agent。
 
----
 ## 使用说明
 执行脚本启动交互菜单：
 ```bash
@@ -29,7 +28,6 @@ sudo agent
 卸载 nezha-agent 及本管理脚本
 退出
 
----
 ## 功能介绍
 ### 安装
 支持选择安装 v0 稳定版本（v0.20.5）或最新 v1 版本（自动获取最新版本号）
