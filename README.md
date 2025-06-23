@@ -1,6 +1,5 @@
 # 哪吒 Agent 管理脚本（agent.sh）
 这是一个用于安装、配置、管理哪吒监控 Agent 的脚本管理面板，支持安装 v0 稳定版本和最新 v1 版本，方便快速部署和维护。
----
 ## 快速安装
 ```bash
 sudo curl -o /usr/local/bin/agent -L https://raw.githubusercontent.com/heyuecock/fuckip/refs/heads/main/agent.sh
@@ -11,7 +10,7 @@ sudo chmod +x /usr/local/bin/agent
 ## 使用说明
 执行脚本启动交互菜单：
 ```bash
-sudo agent
+agent
 ```
 可根据提示选择：
 安装/重装 nezha-agent
@@ -30,12 +29,12 @@ sudo agent
 ### 卸载
 停止 Agent，删除安装文件及本脚本
 
+---
+
 # hy2 - Hysteria 代理微型管理面板
 
 ## 简介
 `hy2` 是一款基于 Hysteria 的轻量级代理管理脚本，可快速创建、修改及删除代理配置，支持 Debian、Ubuntu、Alpine 等主流 Linux 发行版。
-
----
 
 ## 快速安装
 
@@ -80,3 +79,14 @@ hy2
 创建代理时，需要输入监听端口（默认 443）和混淆密码。
 
 修改配置时也可更改端口和密码。
+## 卸载
+选择删除操作后脚本会自动停止服务，清理配置及日志，并删除自身。
+
+如果脚本意外删除，手动删除文件：
+
+```bash
+sudo rm -f /usr/local/bin/hy2
+sudo rm -rf /etc/hysteria
+sudo rm -f /var/log/hysteria.log
+pkill hysteria || true
+```
