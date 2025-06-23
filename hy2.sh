@@ -207,7 +207,7 @@ function uninstall_hysteria() {
 function main_menu() {
   while true; do
     echo "==================================="
-    echo "        Hysteria 微型管理面板"
+    echo "        Hysteria 管理面板"
     echo "==================================="
     echo "1) 创建并启动 hy2 代理"
     echo "2) 修改 hy2 配置（端口和密码）"
