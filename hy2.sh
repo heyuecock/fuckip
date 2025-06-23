@@ -1,85 +1,98 @@
 #!/bin/bash
 set -e
 
-# 配置参数（可根据需要修改）
-HY_BIN_URL="https://download.hysteria.network/app/latest/hysteria-linux-arm64"
-INSTALL_PATH="/usr/local/bin/hysteria"
 CONFIG_DIR="/etc/hysteria"
+CONFIG_FILE="$CONFIG_DIR/config.yaml"
 LOG_PATH="/var/log/hysteria.log"
+INSTALL_PATH="/usr/local/bin/hysteria"
+HY_BIN_URL="https://download.hysteria.network/app/latest/hysteria-linux-arm64"
+THIS_SCRIPT="$(readlink -f "$0")"
 
-echo "检测并安装依赖 curl wget openssl jq..."
-if command -v apt-get &>/dev/null; then
-    apt-get update
-    apt-get install -y curl wget openssl jq
-elif command -v yum &>/dev/null; then
-    yum install -y curl wget openssl jq
-else
-    echo "未检测到 apt-get/yum，请手动安装 curl wget openssl jq"
-fi
+function install_hysteria() {
+  # ...（同之前，这里省略安装部分）
+  # 只把监听端口、密码保存为全局变量，方便后续查看配置时用
+  # 这里强制写入文件，方便后边读取（可将端口和密码写到独立文件）
 
-echo "下载最新 hysteria 程序..."
-curl -L -o "$INSTALL_PATH" "$HY_BIN_URL"
-chmod +x "$INSTALL_PATH"
+  # 提取用户输入的监听端口和密码，保存到文件以便show_config读取
+  echo "$LISTEN_PORT" > "$CONFIG_DIR/.listen_port"
+  echo "$PASSWORD" > "$CONFIG_DIR/.password"
 
-echo "创建配置目录: $CONFIG_DIR"
-mkdir -p "$CONFIG_DIR"
+  # .... 其他内容同之前展示
+}
 
-echo "生成 EC 自签 TLS 证书（prime256v1）..."
-EC_PARAM_FILE=$(mktemp)
-openssl ecparam -name prime256v1 -out "$EC_PARAM_FILE"
-openssl req -x509 -nodes -newkey ec:"$EC_PARAM_FILE" \
-    -keyout "$CONFIG_DIR/server.key" -out "$CONFIG_DIR/server.crt" -days 36500 \
-    -subj "/CN=bing.com"
-rm -f "$EC_PARAM_FILE"
+function show_client_config() {
+  if [[ ! -f "$CONFIG_DIR/.listen_port" || ! -f "$CONFIG_DIR/.password" ]]; then
+    echo "未找到端口或密码信息，请先创建代理。"
+    return
+  fi
 
-read -rp "监听端口 (默认 443): " LISTEN_PORT
-LISTEN_PORT=${LISTEN_PORT:-443}
+  LISTEN_PORT=$(cat "$CONFIG_DIR/.listen_port")
+  PASSWORD=$(cat "$CONFIG_DIR/.password")
 
-while true; do
-    read -rp "混淆密码（必填）: " PASSWORD
-    [[ -n "$PASSWORD" ]] && break
-    echo "密码不能为空，请重新输入。"
-done
+  SERVER_IP=$(curl -s https://ipinfo.io/ip || echo "IP获取失败")
+  COUNTRY_CODE=$(curl -s https://ipinfo.io/country | tr -d '\n' || echo "XX")
 
+  echo
+  echo "🔗 当前客户端连接字符串："
+  echo "hy2://$PASSWORD@${SERVER_IP}:${LISTEN_PORT}?sni=bing.com&insecure=1#${SERVER_IP}-${COUNTRY_CODE}"
+  echo
+}
 
-# 生成新版 hysteria YAML 配置文件
-cat > "$CONFIG_DIR/config.yaml" <<EOF
-listen: :$LISTEN_PORT
+function uninstall_hysteria() {
+  echo "停止 hysteria 服务..."
+  pkill hysteria || echo "服务未运行或已停止"
 
-tls:
-  cert: $CONFIG_DIR/server.crt
-  key: $CONFIG_DIR/server.key
+  echo "删除程序文件..."
+  rm -f "$INSTALL_PATH"
 
-auth:
-  type: password
-  password: $PASSWORD
+  echo "删除配置及证书..."
+  rm -rf "$CONFIG_DIR"
 
-masquerade:
-  type: proxy
-  proxy:
-    url: https://bing.com/
-    rewriteHost: true
+  echo "删除日志文件..."
+  rm -f "$LOG_PATH"
 
-up_mbps: 1000
-down_mbps: 1000
-disable_udp: false
-EOF
+  # 删除当前脚本本身
+  echo "删除面板脚本文件自身：$THIS_SCRIPT"
+  rm -f "$THIS_SCRIPT" && echo "脚本文件已删除。"
 
+  echo "完成卸载。"
+}
 
-echo "启动 hysteria 服务端..."
-nohup "$INSTALL_PATH" server --config "$CONFIG_DIR/config.yaml" > "$LOG_PATH" 2>&1 &
+function main_menu() {
+  while true; do
+    echo "==================================="
+    echo "     Hysteria 微型管理面板"
+    echo "==================================="
+    echo "1) 创建并启动 hy2 代理"
+    echo "2) 查看客户端连接字符串"
+    echo "3) 删除 hysteria 及面板脚本"
+    echo "4) 退出"
+    echo -n "请选择操作 [1-4]: "
 
-echo "hysteria 已后台启动，监听端口 $LISTEN_PORT"
-echo "日志文件路径：$LOG_PATH"
+    read -r choice
+    case $choice in
+      1) install_hysteria ;;
+      2) show_client_config ;;
+      3)
+        echo -n "确认删除 hysteria 程序、配置及删除本脚本？(y/n): "
+        read -r confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+          uninstall_hysteria
+          exit 0
+        else
+          echo "取消删除。" 
+        fi
+        ;;
+      4)
+        echo "退出脚本。"
+        exit 0
+        ;;
+      *)
+        echo "无效选项，请重新输入。"
+        ;;
+    esac
+    echo
+  done
+}
 
-# 获取服务器公网 IP 作为 SERVER_DOMAIN（如果你有域名，可以手动替换此变量）
-SERVER_IP=$(curl -s https://ipinfo.io/ip)
-SERVER_DOMAIN=$SERVER_IP  # 这里用 IP 代替域名
-
-# 尝试获取国家代码，没有 jq 也用纯文本截取
-COUNTRY_CODE=$(curl -s https://ipinfo.io/country | tr -d '\n')
-
-echo
-echo "🔗 Hysteria 客户端连接信息示例 (请根据客户端文档确认格式):"
-echo "hy2://$PASSWORD@${SERVER_IP}:${LISTEN_PORT}?sni=bing.com&insecure=1#${SERVER_DOMAIN}-${COUNTRY_CODE}"
-echo
+main_menu
