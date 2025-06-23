@@ -115,6 +115,10 @@ EOF
   sleep 1
 
   echo "hysteria 已启动，监听端口: $LISTEN_PORT"
+  echo
+  echo "🔗 Hysteria2 客户端连接信息："
+  echo "hy2://$PASSWORD@${SERVER_IP}:${LISTEN_PORT}?sni=bing.com&insecure=1#${SERVER_IP}-${COUNTRY_CODE}"
+  echo
   echo "日志路径: $LOG_PATH"
 }
 
@@ -131,7 +135,7 @@ function show_client_config() {
   COUNTRY_CODE=$(curl -s https://ipinfo.io/country | tr -d '\n' || echo "XX")
 
   echo
-  echo "🔗 当前客户端连接字符串："
+  echo "🔗 Hysteria2 客户端连接信息："
   echo "hy2://$PASSWORD@${SERVER_IP}:${LISTEN_PORT}?sni=bing.com&insecure=1#${SERVER_IP}-${COUNTRY_CODE}"
   echo
 }
