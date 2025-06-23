@@ -2,7 +2,7 @@
 这是一个用于安装、配置、管理哪吒监控 Agent 的脚本管理面板，支持安装 v0 稳定版本和最新 v1 版本，方便快速部署和维护。
 ## 快速安装
 ```bash
-sudo curl -L https://raw.githubusercontent.com/heyuecock/fuckip/refs/heads/main/agent.sh -o /usr/local/bin/agent && sudo chmod +x /usr/local/bin/agent
+sudo curl -L https://raw.githubusercontent.com/heyuecock/fuckip/refs/heads/main/agent.sh -o /usr/local/bin/agent && sudo chmod +x /usr/local/bin/agent && agent
 ```
 执行以上命令即可下载并授权脚本到 /usr/local/bin/agent。
 
@@ -40,7 +40,7 @@ agent
 使用以下命令一键下载安装并添加执行权限：
 
 ```bash
-sudo curl -L https://raw.githubusercontent.com/heyuecock/fuckip/refs/heads/main/hy2.sh -o /usr/local/bin/hy2 && sudo chmod +x /usr/local/bin/hy2
+sudo curl -L https://raw.githubusercontent.com/heyuecock/fuckip/refs/heads/main/hy2.sh -o /usr/local/bin/hy2 && sudo chmod +x /usr/local/bin/hy2 && hy2
 
 ```
 安装完成后，即可在终端输入 hy2 启动管理面板。
