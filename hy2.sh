@@ -5,19 +5,114 @@ CONFIG_DIR="/etc/hysteria"
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
 LOG_PATH="/var/log/hysteria.log"
 INSTALL_PATH="/usr/local/bin/hysteria"
-HY_BIN_URL="https://download.hysteria.network/app/latest/hysteria-linux-arm64"
 THIS_SCRIPT="$(readlink -f "$0")"
 
-function install_hysteria() {
-  # ...（同之前，这里省略安装部分）
-  # 只把监听端口、密码保存为全局变量，方便后续查看配置时用
-  # 这里强制写入文件，方便后边读取（可将端口和密码写到独立文件）
+# 检测架构并返回对应下载链接
+function get_download_url() {
+  local arch=$(uname -m)
+  case "$arch" in
+      x86_64|amd64)
+          echo "https://download.hysteria.network/app/latest/hysteria-linux-amd64"
+          ;;
+      aarch64|arm64)
+          echo "https://download.hysteria.network/app/latest/hysteria-linux-arm64"
+          ;;
+      armv7l)
+          echo "https://download.hysteria.network/app/latest/hysteria-linux-armv7"
+          ;;
+      *)
+          echo ""
+          ;;
+  esac
+}
 
-  # 提取用户输入的监听端口和密码，保存到文件以便show_config读取
+function install_hysteria() {
+  echo "开始安装 hysteria2 代理..."
+
+  echo "检测并安装依赖 curl wget openssl jq"
+  if command -v apt-get &>/dev/null; then
+      apt-get update -qq
+      apt-get install -y curl wget openssl jq
+  elif command -v yum &>/dev/null; then
+      yum install -y curl wget openssl jq
+  else
+      echo "未检测到 apt-get 或 yum，请手动安装 curl wget openssl jq"
+  fi
+
+  HY_BIN_URL=$(get_download_url)
+  if [[ -z "$HY_BIN_URL" ]]; then
+    echo "检测到当前架构不支持自动下载 hysteria，请手动操作。"
+    exit 1
+  fi
+
+  echo "检测架构: $(uname -m)，下载地址：$HY_BIN_URL"
+
+  echo "下载 hysteria2 程序到 $INSTALL_PATH"
+  curl -L -o "$INSTALL_PATH" "$HY_BIN_URL"
+  chmod +x "$INSTALL_PATH"
+
+  echo "创建配置目录：$CONFIG_DIR"
+  mkdir -p "$CONFIG_DIR"
+
+  echo "生成 EC 自签 TLS 证书（prime256v1）..."
+  EC_PARAM_FILE=$(mktemp)
+  openssl ecparam -name prime256v1 -out "$EC_PARAM_FILE"
+  openssl req -x509 -nodes -newkey ec:"$EC_PARAM_FILE" \
+      -keyout "$CONFIG_DIR/server.key" -out "$CONFIG_DIR/server.crt" -days 36500 \
+      -subj "/CN=bing.com" >/dev/null 2>&1
+  rm -f "$EC_PARAM_FILE"
+
+  while true; do
+    read -rp "请输入监听端口（默认 443）: " LISTEN_PORT
+    LISTEN_PORT=${LISTEN_PORT:-443}
+    if [[ $LISTEN_PORT =~ ^[0-9]+$ ]] && (( LISTEN_PORT>0 && LISTEN_PORT<65536 )); then
+      break
+    else
+      echo "端口输入不合法，请输入 1-65535 之间的数字"
+    fi
+  done
+
+  while true; do
+    read -rp "请输入混淆密码（必填）: " PASSWORD
+    if [[ -n "$PASSWORD" ]]; then
+      break
+    else
+      echo "密码不能为空，请重新输入。"
+    fi
+  done
+
+  cat > "$CONFIG_FILE" <<EOF
+listen: :$LISTEN_PORT
+
+tls:
+  cert: $CONFIG_DIR/server.crt
+  key: $CONFIG_DIR/server.key
+
+auth:
+  type: password
+  password: $PASSWORD
+
+masquerade:
+  type: proxy
+  proxy:
+    url: https://bing.com/
+    rewriteHost: true
+
+up_mbps: 1000
+down_mbps: 1000
+disable_udp: false
+EOF
+
   echo "$LISTEN_PORT" > "$CONFIG_DIR/.listen_port"
   echo "$PASSWORD" > "$CONFIG_DIR/.password"
 
-  # .... 其他内容同之前展示
+  echo "启动 hysteria2 服务端..."
+  pkill hysteria 2>/dev/null || true
+  nohup "$INSTALL_PATH" server --config "$CONFIG_FILE" > "$LOG_PATH" 2>&1 &
+  sleep 1
+
+  echo "hysteria 已启动，监听端口: $LISTEN_PORT"
+  echo "日志路径: $LOG_PATH"
 }
 
 function show_client_config() {
@@ -40,56 +135,52 @@ function show_client_config() {
 
 function uninstall_hysteria() {
   echo "停止 hysteria 服务..."
-  pkill hysteria || echo "服务未运行或已停止"
+  pkill hysteria 2>/dev/null || echo "hysteria 服务未运行或已停止"
 
-  echo "删除程序文件..."
+  echo "删除 hysteria 程序文件 $INSTALL_PATH"
   rm -f "$INSTALL_PATH"
 
-  echo "删除配置及证书..."
+  echo "删除配置目录 $CONFIG_DIR"
   rm -rf "$CONFIG_DIR"
 
-  echo "删除日志文件..."
+  echo "删除日志文件 $LOG_PATH"
   rm -f "$LOG_PATH"
 
-  # 删除当前脚本本身
-  echo "删除面板脚本文件自身：$THIS_SCRIPT"
-  rm -f "$THIS_SCRIPT" && echo "脚本文件已删除。"
+  echo "删除管理面板脚本自身：$THIS_SCRIPT"
+  rm -f "$THIS_SCRIPT" && echo "面板脚本已删除。"
 
-  echo "完成卸载。"
+  echo "卸载完成。"
 }
 
 function main_menu() {
   while true; do
     echo "==================================="
-    echo "     Hysteria 微型管理面板"
+    echo "        Hysteria 微型管理面板"
     echo "==================================="
     echo "1) 创建并启动 hy2 代理"
-    echo "2) 查看客户端连接字符串"
-    echo "3) 删除 hysteria 及面板脚本"
+    echo "2) 查看配置"
+    echo "3) 删除 hy2 及面板脚本"
     echo "4) 退出"
-    echo -n "请选择操作 [1-4]: "
-
-    read -r choice
+    read -rp "请选择操作 [1-4]: " choice
     case $choice in
       1) install_hysteria ;;
       2) show_client_config ;;
       3)
-        echo -n "确认删除 hysteria 程序、配置及删除本脚本？(y/n): "
-        read -r confirm
+        read -rp "确认删除 hysteria 程序、配置及本脚本？(y/n): " confirm
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
           uninstall_hysteria
           exit 0
         else
           echo "取消删除。" 
         fi
-        ;;
+      ;;
       4)
-        echo "退出脚本。"
+        echo "退出。"
         exit 0
-        ;;
+      ;;
       *)
-        echo "无效选项，请重新输入。"
-        ;;
+        echo "无效输入，请重新选择。"
+      ;;
     esac
     echo
   done
