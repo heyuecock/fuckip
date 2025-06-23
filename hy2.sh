@@ -115,10 +115,6 @@ EOF
   sleep 1
 
   echo "hysteria 已启动，监听端口: $LISTEN_PORT"
-  echo
-  echo "🔗 Hysteria2 客户端连接信息："
-  echo "hy2://$PASSWORD@${SERVER_IP}:${LISTEN_PORT}?sni=bing.com&insecure=1#${SERVER_IP}-${COUNTRY_CODE}"
-  echo
   echo "日志路径: $LOG_PATH"
   
   show_client_config
